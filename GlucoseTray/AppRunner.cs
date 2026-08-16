@@ -40,6 +40,11 @@ public class AppRunner(ITray tray, IGlucoseReader reader, IOptionsMonitor<AppSet
             tray.Refresh(result);
             _consecutiveFailures = 0;
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Invalid Dexcom") || ex.Message.Contains("account not found") || ex.Message.Contains("account locked"))
+        {
+            tray.Dispose();
+            throw;
+        }
         catch (HttpRequestException ex) when (IsRetryable(ex) && _consecutiveFailures < MaxRetries)
         {
             _consecutiveFailures++;

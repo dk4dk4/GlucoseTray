@@ -23,6 +23,10 @@ public class GlucoseReader(IOptionsMonitor<AppSettings> options, IExternalCommun
             _latestReading = await strategy.GetLatestGlucoseAsync();
             return _latestReading;
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("No cached reading"))
+        {
+            throw;
+        }
         catch
         {
             return _latestReading ?? new GlucoseReading() { TimestampUtc = DateTime.UtcNow, Trend = Trend.Unknown };
