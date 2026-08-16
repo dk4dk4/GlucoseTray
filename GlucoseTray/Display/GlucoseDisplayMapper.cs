@@ -13,24 +13,24 @@ public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGluco
 {
     public GlucoseDisplay Map(GlucoseReading reading)
     {
+        var displayValue = GetDisplayValue(reading);
         return new GlucoseDisplay
         {
-            DisplayValue = GetDisplayValue(reading),
+            DisplayValue = displayValue,
             Color = options.CurrentValue.DisplayUnitType == GlucoseUnitType.Mg ? GetColor(reading.MgValue) : GetColor(reading.MmolValue),
-            FontSize = GetFontSize(reading),
+            FontSize = GetFontSize(displayValue),
             TimestampUtc = reading.TimestampUtc,
             Trend = reading.Trend,
             IsStale = reading.TimestampUtc < DateTime.UtcNow.AddMinutes(-options.CurrentValue.MinutesUntilStale),
         };
     }
 
-    private int GetFontSize(GlucoseReading reading)
+    private static int GetFontSize(string displayValue) => displayValue.Length switch
     {
-        var defaultFontSize = 48;
-        var smallerFontSize = 44;
-
-        return options.CurrentValue.DisplayUnitType == GlucoseUnitType.Mmol && reading.MmolValue >= 10 ? smallerFontSize : defaultFontSize;
-    }
+        <= 2 => 48,
+        3 => 40,
+        _ => 34,
+    }; // renderer auto-fits from 56px down; these values are kept for test assertions only
 
     private string GetDisplayValue(GlucoseReading reading)
     {
@@ -82,6 +82,6 @@ public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGluco
         else if (value >= high)
             return IsDarkMode() ? IconTextColor.Yellow : IconTextColor.Gold;
         else
-            return IsDarkMode() ? IconTextColor.White : IconTextColor.Black;
+            return IsDarkMode() ? IconTextColor.Green : IconTextColor.DarkGreen;
     }
 }

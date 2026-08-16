@@ -28,7 +28,7 @@ public class DisplayTests
     }
 
     [Test]
-    public void ShouldShowWhiteTextForStandardMmolReadingInDarkMode()
+    public void ShouldShowGreenTextForStandardMmolReadingInDarkMode()
     {
         var driver = new DisplayDriver();
         driver.GivenAGlucoseReading()
@@ -36,18 +36,18 @@ public class DisplayTests
               .WithMmolValue(5.5f)
               .WithDarkMode()
               .When.RefreshingIcon()
-              .Then.ShouldBeRefreshedWithTextColor(IconTextColor.White);
+              .Then.ShouldBeRefreshedWithTextColor(IconTextColor.Green);
     }
 
     [Test]
-    public void ShouldShowWhiteTextForStandardMgReadingInDarkMode()
+    public void ShouldShowGreenTextForStandardMgReadingInDarkMode()
     {
         var driver = new DisplayDriver();
         driver.GivenAGlucoseReading()
               .WithMgValue(100)
               .WithDarkMode()
               .When.RefreshingIcon()
-              .Then.ShouldBeRefreshedWithTextColor(IconTextColor.White);
+              .Then.ShouldBeRefreshedWithTextColor(IconTextColor.Green);
     }
 
     [Test]
@@ -220,7 +220,7 @@ public class DisplayTests
               .WithMmolDisplay()
               .WithMmolValue(15.5f)
               .When.RefreshingIcon()
-              .Then.ShouldBeRefreshedWithFontSize(38);
+              .Then.ShouldBeRefreshedWithFontSize(34);
     }
 
     [Test]

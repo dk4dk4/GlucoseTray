@@ -68,18 +68,30 @@ public class NotificationIcon : ITrayIcon
 
     private void CreateTextIcon(GlucoseDisplay display)
     {
-        var bitmapText = new Bitmap(64, 64);
+        const float bitmapSize = 64f;
+        const float targetFontSize = 54f;
+        const float margin = 4f;
+
+        var bitmapText = new Bitmap((int)bitmapSize, (int)bitmapSize);
         var g = Graphics.FromImage(bitmapText);
         g.Clear(Color.Transparent);
         g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
         var fontStyle = display.IsStale ? FontStyle.Strikeout : FontStyle.Regular;
-        using var font = new Font("Roboto", display.FontSize, fontStyle, GraphicsUnit.Pixel);
         var format = StringFormat.GenericTypographic;
-        var size = g.MeasureString(display.DisplayValue, font, int.MaxValue, format);
-        var x = Math.Max(0f, (64f - size.Width) / 2f);
-        var y = Math.Max(0f, (64f - size.Height) / 2f);
+        using var font = new Font("Roboto", targetFontSize, fontStyle, GraphicsUnit.Pixel);
+        var measured = g.MeasureString(display.DisplayValue, font, int.MaxValue, format);
+
+        // If text is too wide, compress it horizontally only — preserving height for readability
+        var scaleX = measured.Width > bitmapSize - margin
+            ? (bitmapSize - margin) / measured.Width
+            : 1f;
+        if (scaleX < 1f)
+            g.ScaleTransform(scaleX, 1f);
+
+        var x = (bitmapSize / scaleX - measured.Width) / 2f;
+        var y = Math.Max(0f, (bitmapSize - measured.Height) / 2f);
 
         var mainColor = Convert(display.Color);
         DrawWithOutline(g, display.DisplayValue, font, format, mainColor, x, y);
@@ -126,6 +138,8 @@ public class NotificationIcon : ITrayIcon
         IconTextColor.Yellow => Color.Yellow,
         IconTextColor.Gold => Color.DarkGoldenrod,
         IconTextColor.Red => Color.OrangeRed,
+        IconTextColor.Green => Color.FromArgb(52, 199, 89),     // #34C759 iOS green — bright on dark taskbar
+        IconTextColor.DarkGreen => Color.FromArgb(40, 167, 69), // #28A745 — readable on light taskbar
         _ => Color.Black,
     };
 }
