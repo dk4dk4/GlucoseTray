@@ -5,10 +5,13 @@ namespace GlucoseTray.Read.Dexcom;
 
 internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAdapter communicator, IGlucoseReadingMapper mapper) : IReadStrategy
 {
+    private string? _cachedSessionId;
+    private DateTime _sessionExpiry = DateTime.MinValue;
+    private readonly TimeSpan SessionTTL = TimeSpan.FromHours(1);
+
     public async Task<GlucoseReading> GetLatestGlucoseAsync()
     {
-        string accountId = await GetAccountIdAsync();
-        string sessionId = await GetSessionIdAsync(accountId);
+        string sessionId = await GetSessionIdAsync();
         string response = await GetApiResponseAsync(sessionId);
 
         var data = JsonSerializer.Deserialize<List<DexcomResult>>(response)!.First();
@@ -24,8 +27,12 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
         return result;
     }
 
-    private async Task<string> GetSessionIdAsync(string accountId)
+    private async Task<string> GetSessionIdAsync()
     {
+        if (!string.IsNullOrEmpty(_cachedSessionId) && DateTime.UtcNow < _sessionExpiry)
+            return _cachedSessionId;
+
+        string accountId = await GetAccountIdAsync();
         var sessionIdRequestJson = JsonSerializer.Serialize(new
         {
             accountId,
@@ -34,9 +41,11 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
         });
 
         var sessionUrl = $"https://{GetDexComServer()}/ShareWebServices/Services/General/LoginPublisherAccountById";
-
         var result = await communicator.PostApiResponseAsync(sessionUrl, sessionIdRequestJson);
-        var sessionId = result.Replace("\"", "");
+        var sessionId = DeserializeStringResponse(result);
+
+        _cachedSessionId = sessionId;
+        _sessionExpiry = DateTime.UtcNow.Add(SessionTTL);
 
         return sessionId;
     }
@@ -53,9 +62,21 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
         var accountUrl = $"https://{GetDexComServer()}/ShareWebServices/Services/General/AuthenticatePublisherAccount";
 
         var result = await communicator.PostApiResponseAsync(accountUrl, accountIdRequestJson);
-        var accountId = result.Replace("\"", "");
+        var accountId = DeserializeStringResponse(result);
 
         return accountId;
+    }
+
+    private static string DeserializeStringResponse(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<string>(json) ?? throw new InvalidOperationException("Response was null");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"Failed to deserialize response: {json}", ex);
+        }
     }
 
     public string GetDexComServer() => settings.DexcomServer switch

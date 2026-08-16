@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Text;
+using System.Text.Json;
 
 namespace GlucoseTray.Read.Nightscout;
 
@@ -7,18 +8,33 @@ internal class NightscoutReadStrategy(AppSettings settings, IExternalCommunicati
     public async Task<GlucoseReading> GetLatestGlucoseAsync()
     {
         var response = await GetApiResponseAsync();
-        var data = JsonSerializer.Deserialize<List<NightScoutResult>>(response)!.Last();
-
-        var result = mapper.Map(data);
-        return result;
+        try
+        {
+            var data = JsonSerializer.Deserialize<List<NightScoutResult>>(response)!.Last();
+            var result = mapper.Map(data);
+            return result;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"Failed to parse Nightscout response: {response}", ex);
+        }
     }
 
     private async Task<string> GetApiResponseAsync()
     {
-        var url = $"{settings.NightscoutUrl.TrimEnd('/')}/api/v1/entries/sgv?count=1";
-        url += !string.IsNullOrWhiteSpace(settings.NightscoutToken) ? $"&token={settings.NightscoutToken}" : string.Empty;
+        var baseUrl = settings.NightscoutUrl.TrimEnd('/');
+        var uriBuilder = new UriBuilder(baseUrl)
+        {
+            Path = "/api/v1/entries/sgv",
+            Query = "count=1"
+        };
 
-        var result = await communicator.GetApiResponseAsync(url);
+        var url = uriBuilder.Uri.ToString();
+        var tokenHeader = !string.IsNullOrWhiteSpace(settings.NightscoutToken)
+            ? settings.NightscoutToken
+            : null;
+
+        var result = await communicator.GetApiResponseAsync(url, content: null, authHeader: tokenHeader);
         return result;
     }
 }

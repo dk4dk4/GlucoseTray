@@ -13,13 +13,24 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4.1.7
+
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v4.0.1
       with:
         dotnet-version: 10.x
-    - name: Install dependencies
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
       run: dotnet restore -p:SelfContained=true
-    - name: Build
+
+    - name: Build (Release)
       run: dotnet build --configuration Release --no-restore
     - name: Dotnet Tests
       # You may pin to the exact commit or the version.

@@ -1,25 +1,21 @@
-# To create a release:
-# git tag v1.0.0
-# git push origin v1.0.0
-# or
-# use Github UI -> Create Release -> Create New Tag -> v1.0.0 -> Publish Release
-
-name: Create release
+name: Build on Push to Master
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [ master ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
 
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
-    - uses: actions/checkout@v4.1.2
-      with:
-        fetch-depth: 0 # Fetch all history for all tags
+    - uses: actions/checkout@v4.1.7
+
     - name: Setup .NET Core
-      uses: actions/setup-dotnet@v4.3.1
+      uses: actions/setup-dotnet@v4.0.1
       with:
         dotnet-version: 10.x
 
@@ -31,40 +27,28 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
 
-    - name: create-release-notes
-      id: notes
-      uses: johnyherangi/create-release-notes@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     - name: Restore dependencies
       run: dotnet restore -p:SelfContained=true
-    - name: Build
+
+    - name: Build (Release)
       run: dotnet build --configuration Release --no-restore
-    - name: Dotnet Tests
-      uses: EasyDesk/action-dotnet-test@v1.3.0
+
+    - name: Run Tests
+      uses: EasyDesk/action-dotnet-test@v1.0.0
       with:
-        skip-build: true # optional, default is true
+        skip-build: true
+
     - name: Publish Standard Exe
       run: dotnet publish GlucoseTray\GlucoseTray.csproj --configuration Release --no-restore -p:PublishProfile=GlucoseTray\Properties\PublishProfiles\PublishToSingleSelfContainedExe.pubxml
 
     - name: Publish Slim Exe
       run: dotnet publish GlucoseTray\GlucoseTray.csproj --configuration Release --no-restore -p:PublishProfile=GlucoseTray\Properties\PublishProfiles\PublishToSingleSelfContainedExeWthoutFramework.pubxml
-    - name: Create a new release note
-      uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
       with:
-        tag_name: ${{ github.ref_name }}
-        name: GlucoseTray ${{ github.ref_name }}
-        body: |
-          ${{ steps.notes.outputs.release-notes }}
-        draft: false
-        prerelease: false
-        append_body: true
-        fail_on_unmatched_files: true
-        generate_release_notes: true
-        files: |
+        name: GlucoseTray-Build
+        path: |
           ./GlucoseTray/bin/Release/net10.0-windows7.0/publish/win-x64/GlucoseTray.exe
           ./GlucoseTray/bin/Release/net10.0-windows7.0/publish/win-x64-small/GlucoseTray-Slim.exe
-          ./README.md
+        retention-days: 30
