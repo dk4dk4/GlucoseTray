@@ -16,32 +16,29 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
         string sessionId = await GetSessionIdAsync();
 
         var dataRange = await GetDataRangeAsync(sessionId);
-        if (dataRange?.LatestEgvTimeMs == null || dataRange.LatestEgvTimeMs <= 0)
+        if (dataRange?.LatestEgvTimeMs > 0)
         {
-            throw new InvalidOperationException("Failed to get data range from Dexcom");
+            var latestEgvTime = UnixTimeStampToDateTime(dataRange.LatestEgvTimeMs);
+            if (latestEgvTime > _lastSyncTime)
+            {
+                string response = await GetApiResponseAsync(sessionId);
+                var data = JsonSerializer.Deserialize<List<DexcomResult>>(response)!.First();
+                _lastSyncTime = latestEgvTime;
+                var result = mapper.Map(data);
+                return result;
+            }
+            else if (_lastSyncTime > DateTime.MinValue)
+            {
+                return new GlucoseReading { TimestampUtc = _lastSyncTime, Trend = Trend.Unknown };
+            }
         }
 
-        var latestEgvTime = UnixTimeStampToDateTime(dataRange.LatestEgvTimeMs);
-        if (latestEgvTime <= _lastSyncTime)
-        {
-            return GetLastReadingOrThrow();
-        }
+        string directResponse = await GetApiResponseAsync(sessionId);
+        var directData = JsonSerializer.Deserialize<List<DexcomResult>>(directResponse)!.First();
+        _lastSyncTime = DateTime.UtcNow;
 
-        string response = await GetApiResponseAsync(sessionId);
-        var data = JsonSerializer.Deserialize<List<DexcomResult>>(response)!.First();
-        _lastSyncTime = latestEgvTime;
-
-        var result = mapper.Map(data);
-        return result;
-    }
-
-    private GlucoseReading GetLastReadingOrThrow()
-    {
-        if (_lastSyncTime == DateTime.MinValue)
-        {
-            throw new InvalidOperationException("No cached reading available and no new data from Dexcom");
-        }
-        return new GlucoseReading { TimestampUtc = _lastSyncTime, Trend = Trend.Unknown };
+        var directResult = mapper.Map(directData);
+        return directResult;
     }
 
     private async Task<DexcomDataRange?> GetDataRangeAsync(string sessionId)
@@ -52,10 +49,9 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
             var response = await communicator.PostApiResponseAsync(url, sessionId);
             return JsonSerializer.Deserialize<DexcomDataRange>(response);
         }
-        catch (Exception ex)
+        catch
         {
-            ThrowDexcomSpecificError(ex.Message);
-            throw;
+            return null;
         }
     }
 
@@ -90,21 +86,15 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
 
         var url = $"https://{GetDexComServer()}/ShareWebServices/Services/General/LoginPublisherAccountByName";
 
-        try
-        {
-            var response = await communicator.PostApiResponseAsync(url, loginRequest);
-            var sessionId = DeserializeStringResponse(response);
+        var response = await communicator.PostApiResponseAsync(url, loginRequest);
+        ThrowIfDexcomError(response);
 
-            _cachedSessionId = sessionId;
-            _sessionExpiry = DateTime.UtcNow.Add(SessionTTL);
+        var sessionId = DeserializeStringResponse(response);
 
-            return sessionId;
-        }
-        catch (Exception ex)
-        {
-            ThrowDexcomSpecificError(ex.Message);
-            throw;
-        }
+        _cachedSessionId = sessionId;
+        _sessionExpiry = DateTime.UtcNow.Add(SessionTTL);
+
+        return sessionId;
     }
 
     private async Task<string> RefreshSessionAsync()
@@ -125,7 +115,7 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
         }
     }
 
-    private static void ThrowDexcomSpecificError(string responseBody)
+    private static void ThrowIfDexcomError(string responseBody)
     {
         if (responseBody.Contains("AccountPasswordInvalid") || responseBody.Contains("PasswordInvalid"))
             throw new InvalidOperationException("Invalid Dexcom password. Fix credentials and restart.");
