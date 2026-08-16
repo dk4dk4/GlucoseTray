@@ -1,0 +1,6 @@
+{
+  "env": {
+    "DOTNET_ROOT": "C:\\Program Files\\dotnet",
+    "PATH": "C:\\Program Files\\dotnet;%PATH%"
+  }
+}

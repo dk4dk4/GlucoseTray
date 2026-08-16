@@ -5,7 +5,7 @@ namespace GlucoseTray;
 
 public class AppSettings
 {
-    public bool IsDarkMode { get; set; } = false;
+    public bool? IsDarkMode { get; set; } = null;
     public int MinutesUntilStale { get; set; } = 15;
     public int RefreshIntervalInMinutes { get; set; } = 5;
 

@@ -26,8 +26,8 @@ public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGluco
 
     private int GetFontSize(GlucoseReading reading)
     {
-        var defaultFontSize = 40;
-        var smallerFontSize = 38;
+        var defaultFontSize = 48;
+        var smallerFontSize = 44;
 
         return options.CurrentValue.DisplayUnitType == GlucoseUnitType.Mmol && reading.MmolValue >= 10 ? smallerFontSize : defaultFontSize;
     }
@@ -69,17 +69,19 @@ public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGluco
         return GetColor(mmolValue, settings.CriticalLowMmolThreshold, settings.LowMmolThreshold, settings.HighMmolThreshold, settings.CriticalHighMmolThreshold);
     }
 
+    private bool IsDarkMode() => options.CurrentValue.IsDarkMode ?? WindowsThemeHelper.IsDarkMode();
+
     private IconTextColor GetColor(float value, float criticalLow, float low, float high, float criticalHigh)
     {
         if (value <= criticalLow)
             return IconTextColor.Red;
         else if (value <= low)
-            return options.CurrentValue.IsDarkMode ? IconTextColor.Yellow : IconTextColor.Gold;
+            return IsDarkMode() ? IconTextColor.Yellow : IconTextColor.Gold;
         else if (value >= criticalHigh)
             return IconTextColor.Red;
         else if (value >= high)
-            return options.CurrentValue.IsDarkMode ? IconTextColor.Yellow : IconTextColor.Gold;
+            return IsDarkMode() ? IconTextColor.Yellow : IconTextColor.Gold;
         else
-            return options.CurrentValue.IsDarkMode ? IconTextColor.White : IconTextColor.Black;
+            return IsDarkMode() ? IconTextColor.White : IconTextColor.Black;
     }
 }
