@@ -39,7 +39,7 @@ public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGluco
         if (displayUnitType == GlucoseUnitType.Mg)
         {
             if (reading.MgValue == 0)
-                return "NUL";
+                return "--";
             if (IsCriticalLow(reading.MgValue))
                 return "DAN";
             return reading.MgValue.ToString();
@@ -47,7 +47,7 @@ public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGluco
         else
         {
             if (reading.MmolValue == 0)
-                return "NUL";
+                return "--";
             if (IsCriticalLow(reading.MmolValue))
                 return "DAN";
             return reading.MmolValue.ToString("0.0").Replace('.', '\''); // ' uses less space than .

@@ -22,6 +22,7 @@ public class NotificationIcon : ITrayIcon
 {
     private readonly NotifyIcon _trayIcon;
     private GlucoseDisplay? _latestGlucose;
+    private const string BalloonTipTitle = "Glucose Reading";
 
     public NotificationIcon()
     {
@@ -34,7 +35,7 @@ public class NotificationIcon : ITrayIcon
     }
 
     public void ShowNotification(string alertText) => _trayIcon.ShowBalloonTip(2000, "Glucose Alert", alertText, ToolTipIcon.Warning);
-    private void ShowBalloon(object? sender, EventArgs e) => _trayIcon?.ShowBalloonTip(2000, "Glucose", _latestGlucose?.GetDisplayMessage(DateTime.UtcNow) ?? "error", ToolTipIcon.Info);
+    private void ShowBalloon(object? sender, EventArgs e) => _trayIcon?.ShowBalloonTip(2000, BalloonTipTitle, _latestGlucose?.GetDisplayMessage(DateTime.UtcNow) ?? "error", ToolTipIcon.Info);
 
     public void ClearMenu() => _trayIcon?.ContextMenuStrip?.Items.Clear();
     public void AddAutoRunMenu(bool isAlreadyOn, EventHandler toggleCallback) => _trayIcon?.ContextMenuStrip?.Items.Add(new ToolStripMenuItem(isAlreadyOn ? "Disable auto-start" : "Run on startup", null, toggleCallback));

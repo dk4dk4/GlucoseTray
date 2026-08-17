@@ -9,10 +9,13 @@ public class AppRunner(ITray tray, IGlucoseReader reader, IOptionsMonitor<AppSet
 {
     private int _consecutiveFailures = 0;
     private readonly int MaxRetries = 3;
+    private const int MinRefreshIntervalMinutes = 5; // Matches Dexcom Share's server-side update cadence; polling faster only burns API calls and risks a rate-limit lockout.
+    private static readonly TimeSpan ConfigChangeDebounce = TimeSpan.FromSeconds(2);
+    private CancellationTokenSource? _configChangeDebounceCts;
 
     public async Task Start()
     {
-        options.OnChange(async _ => await Process());
+        options.OnChange(_ => OnConfigChanged());
 
         await Process();
 
@@ -20,7 +23,7 @@ public class AppRunner(ITray tray, IGlucoseReader reader, IOptionsMonitor<AppSet
         {
             try
             {
-                await Task.Delay(TimeSpan.FromMinutes(Math.Max(options.CurrentValue.RefreshIntervalInMinutes, 1)));
+                await Task.Delay(TimeSpan.FromMinutes(Math.Max(options.CurrentValue.RefreshIntervalInMinutes, MinRefreshIntervalMinutes)));
                 await Process();
                 _consecutiveFailures = 0;
             }
@@ -29,6 +32,31 @@ public class AppRunner(ITray tray, IGlucoseReader reader, IOptionsMonitor<AppSet
                 tray.Dispose();
                 throw;
             }
+        }
+    }
+
+    private void OnConfigChanged()
+    {
+        // IOptionsMonitor.OnChange commonly fires multiple times for a single file save
+        // (editors write via temp-file + rename). Debounce so one save triggers one Process() call.
+        var cts = new CancellationTokenSource();
+        var previousCts = Interlocked.Exchange(ref _configChangeDebounceCts, cts);
+        previousCts?.Cancel();
+        previousCts?.Dispose();
+
+        _ = DebouncedProcessAsync(cts.Token);
+    }
+
+    private async Task DebouncedProcessAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(ConfigChangeDebounce, token);
+            await Process();
+        }
+        catch (TaskCanceledException)
+        {
+            // Superseded by a newer config change; ignore.
         }
     }
 
