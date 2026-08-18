@@ -102,4 +102,23 @@ public class ReadTests
               .When.CommunicationErrorOccurs()
               .Then.ShouldHaveMgValueOf(100);
     }
+
+    [Test]
+    public void ShouldReturnUnknownTrendInsteadOfFailingWhenDexcomHasNoNewReadingsYet()
+    {
+        var driver = new ReadDriver();
+        driver.GivenADexcomResult()
+              .When.GettingLatestDexcomReadingWithNoNewData()
+              .Then.ShouldHaveUnknownTrend()
+              .ShouldNotHaveMarkedFetchAsFailed();
+    }
+
+    [Test]
+    public void ShouldTreatAShortDexcomSessionIdAsAFailure()
+    {
+        var driver = new ReadDriver();
+        driver.GivenADexcomResult()
+              .When.GettingLatestDexcomReadingWithInvalidSessionId()
+              .Then.ShouldHaveMarkedFetchAsFailed();
+    }
 }

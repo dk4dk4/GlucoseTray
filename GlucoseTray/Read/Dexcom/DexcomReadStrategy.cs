@@ -10,6 +10,7 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
     private DateTime _lastSyncTime = DateTime.MinValue;
     private readonly TimeSpan SessionTTL = TimeSpan.FromHours(24);
     private readonly TimeSpan ProactiveRefreshPoint = TimeSpan.FromHours(12);
+    private const int MinSessionIdLength = 32; // Dexcom session IDs are GUIDs; shorter responses are garbage/error bodies.
 
     public async Task<GlucoseReading> GetLatestGlucoseAsync()
     {
@@ -22,9 +23,12 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
             if (latestEgvTime > _lastSyncTime)
             {
                 string response = await GetApiResponseAsync(sessionId);
-                var data = JsonSerializer.Deserialize<List<DexcomResult>>(response)!.First();
+                var data = JsonSerializer.Deserialize<List<DexcomResult>>(response)!;
+                if (data.Count == 0)
+                    return new GlucoseReading { TimestampUtc = _lastSyncTime, Trend = Trend.Unknown };
+
                 _lastSyncTime = latestEgvTime;
-                var result = mapper.Map(data);
+                var result = mapper.Map(data.First());
                 return result;
             }
             else if (_lastSyncTime > DateTime.MinValue)
@@ -34,10 +38,15 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
         }
 
         string directResponse = await GetApiResponseAsync(sessionId);
-        var directData = JsonSerializer.Deserialize<List<DexcomResult>>(directResponse)!.First();
+        var directData = JsonSerializer.Deserialize<List<DexcomResult>>(directResponse)!;
+        // Empty array (e.g. sensor warmup) is expected, not a failure — surface the last known
+        // reading instead of throwing, so it isn't mistaken for a communication error upstream.
+        if (directData.Count == 0)
+            return new GlucoseReading { TimestampUtc = _lastSyncTime, Trend = Trend.Unknown };
+
         _lastSyncTime = DateTime.UtcNow;
 
-        var directResult = mapper.Map(directData);
+        var directResult = mapper.Map(directData.First());
         return directResult;
     }
 
@@ -90,6 +99,11 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
         ThrowIfDexcomError(response);
 
         var sessionId = DeserializeStringResponse(response);
+
+        // Dexcom returns a GUID session ID on success; a short/garbage 200 response shouldn't be
+        // cached and trusted as a valid session for subsequent reads.
+        if (sessionId.Length < MinSessionIdLength)
+            throw new InvalidOperationException($"Dexcom login returned an invalid session ID: {sessionId}");
 
         _cachedSessionId = sessionId;
         _sessionExpiry = DateTime.UtcNow.Add(SessionTTL);

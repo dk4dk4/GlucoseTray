@@ -8,12 +8,15 @@ namespace GlucoseTray.Tests.DSL.Read;
 
 internal class ReadBehaviorDriver(ReadProvider provider, DexcomResult dexcomResult, NightScoutResult nightscoutResult)
 {
+    // Dexcom's login endpoint returns a JSON-encoded GUID string; DexcomReadStrategy now
+    // requires >=32 chars to accept it as a valid session ID, so the mock must match that shape.
+    private const string SessionId = "11111111-1111-1111-1111-111111111111";
+
     public ReadBehaviorDriver GettingLatestDexcomReading()
     {
-        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains("bob"))).Returns("1account");
-        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains("1account"))).Returns("1session");
+        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains("bob"))).Returns($"\"{SessionId}\"");
         var data = JsonSerializer.Serialize(new List<DexcomResult> { dexcomResult });
-        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains("1session"))).Returns(data);
+        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains(SessionId))).Returns(data);
         provider.Runner.Process().Wait();
         return this;
     }
@@ -22,6 +25,22 @@ internal class ReadBehaviorDriver(ReadProvider provider, DexcomResult dexcomResu
     {
         var data = JsonSerializer.Serialize(new List<NightScoutResult> { nightscoutResult });
         provider.ExternalCommunicationAdapter.GetApiResponseAsync(Arg.Any<string>()).Returns(data);
+        provider.Runner.Process().Wait();
+        return this;
+    }
+
+    public ReadBehaviorDriver GettingLatestDexcomReadingWithNoNewData()
+    {
+        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains("bob"))).Returns($"\"{SessionId}\"");
+        var emptyData = JsonSerializer.Serialize(new List<DexcomResult>());
+        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains(SessionId))).Returns(emptyData);
+        provider.Runner.Process().Wait();
+        return this;
+    }
+
+    public ReadBehaviorDriver GettingLatestDexcomReadingWithInvalidSessionId()
+    {
+        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains("bob"))).Returns("\"tooshort\"");
         provider.Runner.Process().Wait();
         return this;
     }
