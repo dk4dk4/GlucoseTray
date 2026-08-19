@@ -121,4 +121,15 @@ public class ReadTests
               .When.GettingLatestDexcomReadingWithInvalidSessionId()
               .Then.ShouldHaveMarkedFetchAsFailed();
     }
+
+    [Test]
+    public void ShouldReLoginAndRecoverWhenDexcomRejectsACachedSession()
+    {
+        var driver = new ReadDriver();
+        driver.GivenADexcomResult()
+              .WithMgValue(100)
+              .When.GettingLatestDexcomReadingWhenServerRejectsSession()
+              .Then.ShouldHaveMgValueOf(100)
+              .ShouldNotHaveMarkedFetchAsFailed();
+    }
 }

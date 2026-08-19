@@ -45,6 +45,28 @@ internal class ReadBehaviorDriver(ReadProvider provider, DexcomResult dexcomResu
         return this;
     }
 
+    public ReadBehaviorDriver GettingLatestDexcomReadingWhenServerRejectsSession()
+    {
+        provider.ExternalCommunicationAdapter.PostApiResponseAsync(Arg.Any<string>(), Arg.Is<string>(x => x.Contains("bob"))).Returns($"\"{SessionId}\"");
+
+        var dataRange = JsonSerializer.Serialize(new DexcomDataRange { LatestEgvTimeMs = 1 });
+        provider.ExternalCommunicationAdapter
+            .PostApiResponseAsync(Arg.Is<string>(u => u.Contains("ReadPublisherDataRange")), Arg.Is<string>(x => x.Contains(SessionId)))
+            .Returns(dataRange);
+
+        var data = JsonSerializer.Serialize(new List<DexcomResult> { dexcomResult });
+        var sessionNotValid = new HttpRequestException(
+            "API returned InternalServerError: {\"Code\":\"SessionNotValid\",\"Message\":\"Session not active or timed out.\"}",
+            null,
+            System.Net.HttpStatusCode.InternalServerError);
+        provider.ExternalCommunicationAdapter
+            .PostApiResponseAsync(Arg.Is<string>(u => u.Contains("ReadPublisherLatestGlucoseValues")), Arg.Is<string>(x => x.Contains(SessionId)))
+            .Returns(x => throw sessionNotValid, x => data);
+
+        provider.Runner.Process().Wait();
+        return this;
+    }
+
     public ReadBehaviorDriver CommunicationErrorOccurs()
     {
         provider.ExternalCommunicationAdapter.GetApiResponseAsync(Arg.Any<string>()).ThrowsAsync(x => throw new Exception());

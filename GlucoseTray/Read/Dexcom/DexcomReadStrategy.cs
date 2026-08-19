@@ -14,6 +14,25 @@ internal class DexcomReadStrategy(AppSettings settings, IExternalCommunicationAd
 
     public async Task<GlucoseReading> GetLatestGlucoseAsync()
     {
+        try
+        {
+            return await GetLatestGlucoseInternalAsync();
+        }
+        catch (HttpRequestException ex) when (IsSessionInvalidError(ex))
+        {
+            // The server can invalidate a session (e.g. after the PC sleeps overnight) well
+            // before our local TTL expires, so a rejected session must force a fresh login
+            // instead of being retried as-is on the next poll.
+            _cachedSessionId = null;
+            return await GetLatestGlucoseInternalAsync();
+        }
+    }
+
+    private static bool IsSessionInvalidError(HttpRequestException ex) =>
+        ex.Message.Contains("SessionNotValid") || ex.Message.Contains("SessionIdNotFound");
+
+    private async Task<GlucoseReading> GetLatestGlucoseInternalAsync()
+    {
         string sessionId = await GetSessionIdAsync();
 
         var dataRange = await GetDataRangeAsync(sessionId);
