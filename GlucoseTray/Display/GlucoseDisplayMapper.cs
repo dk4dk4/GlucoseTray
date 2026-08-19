@@ -11,9 +11,12 @@ public interface IGlucoseDisplayMapper
 
 public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGlucoseDisplayMapper
 {
+    private const string StaleDisplayValue = "---";
+
     public GlucoseDisplay Map(GlucoseReading reading)
     {
-        var displayValue = GetDisplayValue(reading);
+        var isStale = reading.TimestampUtc < DateTime.UtcNow.AddMinutes(-options.CurrentValue.MinutesUntilStale);
+        var displayValue = isStale ? StaleDisplayValue : GetDisplayValue(reading);
         return new GlucoseDisplay
         {
             DisplayValue = displayValue,
@@ -21,7 +24,7 @@ public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGluco
             FontSize = GetFontSize(displayValue),
             TimestampUtc = reading.TimestampUtc,
             Trend = reading.Trend,
-            IsStale = reading.TimestampUtc < DateTime.UtcNow.AddMinutes(-options.CurrentValue.MinutesUntilStale),
+            IsStale = isStale,
         };
     }
 
