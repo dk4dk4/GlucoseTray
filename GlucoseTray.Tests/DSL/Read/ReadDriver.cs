@@ -22,6 +22,7 @@ internal class ReadDriver
         DexcomUsername = "bob",
         DexcomPassword = "pass",
         ServerUnitType = GlucoseUnitType.Mg,
+        NightscoutUrl = "https://nightscout.example.com",
     };
 
     public ReadDriver() => _provider.Options.CurrentValue.Returns(_settings);
